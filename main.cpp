@@ -17,7 +17,7 @@
 int main( int argc, char **argv ) {
 
     // Parse args
-    std::string usage = "Usage: pcap_test [-hbst] [-p ] [-x ] -f filename";
+    std::string usage = "Usage: pcap_test [-hbst] [-p protocol..] [-i include_ips..] [-x exclude_ips..] -f filename";
     opterr = 0;
 
     // String representing available short options
