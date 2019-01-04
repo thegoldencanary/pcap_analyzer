@@ -10,64 +10,62 @@
 #include <arpa/inet.h>
 #include <vector>
 #include <unordered_map>
+#include <getopt.h>
 
-// Parse and return info
-std::string parse_packet( const struct pcap_pkthdr *header, const u_char *packet )
-{
-    // Setup our structs for holding header data
-    const struct ether_header *eth_hdr;
-    const struct ip *ip_hdr;
-    const struct tcphdr *tcp_hdr;
-
-    // Get the inital ethernet header
-    eth_hdr = ( struct ether_header* ) packet;
-
-    // Check the type of payload
-    // If IP
-    if( ntohs( eth_hdr->ether_type ) == ETHERTYPE_IP )
-    {
-        // Get IP header
-        ip_hdr = ( struct ip* )( packet + sizeof(struct ether_header ) );
-
-        // Check type of payload
-        // If TCP
-        if( ip_hdr->ip_p == IPPROTO_TCP )
-        {
-            // Get header
-            tcp_hdr = ( tcphdr* )( packet + sizeof( struct ether_header )
-                                + sizeof( struct ip ) );
-            // Get pointer to data
-            u_char *data;
-            data = ( u_char * )( packet + sizeof( struct ether_header )
-                                        + sizeof( struct ip )
-                                        + sizeof( struct tcphdr ) );
-            int length = header->caplen - sizeof( struct ether_header )
-                                        - sizeof( struct ip )
-                                        - sizeof( struct tcphdr );
-            return std::string(data, data + length);
-        }
-        else
-        {
-            // Unsupported protocol, will return
-            return "";
-        }
-    }else
-    {
-        // Unsupported ethertype, will return
-        return "";
-    }
-}
+#include "PacketParser.h"
 
 int main( int argc, char **argv ) {
 
     // Parse args
-    std::string help_text = "pcap_test filename source_ip";
-    if( argc < 3 )
+    std::string usage = "Usage: pcap_test [-hbst] [-p ] [-x ] -f filename";
+    opterr = 0;
+
+    // String representing available short options
+    const char *optstring = "f:hbp:i:x:st";
+
+    // Struct array of long options
+    // { name, has_arg, flag, value }
+    const struct option longopts[] =
     {
-        std::cout << "Invalid number of arguments" << std::endl;
-        std::cout << help_text << std::endl;
-        return 1;
+        {"filename", required_argument, NULL, 'f'},
+        {"histogram", no_argument, NULL, 'h'},
+        {"bytes", no_argument, NULL, 'b'},
+        {"protocols", required_argument, NULL, 'p'},
+        {"include-ip", required_argument, NULL, 'i'},
+        {"exclude-ip", required_argument, NULL, 'x'},
+        {"statistics", no_argument, NULL, 's'},
+        {"throughput", no_argument, NULL, 't'}
+    };
+
+    int longindex = 0;
+    char value = 0;
+    while( ( value = getopt_long( argc, argv, optstring, longopts, &longindex) ) != -1 )
+    {
+        switch( value )
+        {
+            case 'f':
+                break;
+            case 'h':
+                break;
+            case 'b':
+                break;
+            case 'p':
+                break;
+            case 'i':
+                break;
+            case 'x':
+                break;
+            case 's':
+                break;
+            case 't':
+                break;
+            default:
+                char unknown = optopt;
+                std::cout << "Unknown option: " << unknown << "\n"
+                          << usage << std::endl;
+        }
     }
+
     char *input_filename = argv[1];
     char *source_ip = argv[2];
 
@@ -83,31 +81,18 @@ int main( int argc, char **argv ) {
         return 1;
     }
 
-    // Sniff packets
-    const u_char *packet;
-    struct pcap_pkthdr *header;
-    while( 1 )
-    {
-        // Get next
-        int return_code = pcap_next_ex( file_handle,
-                                        &header,
-                                        &packet);
-        // Check if error or end
-        // End of packets
-        if( return_code < -1 )
-        {
-            break;
-        }
-        // Error occurred
-        if( return_code == -1 )
-        {
-            std::cout << "Error occurred while reading: "
-                        << pcap_geterr( file_handle ) << std::endl;
-            return 1;
-        }
-        // If good, parse and output packet
-        std::cout << parse_packet( header, packet ) << std::endl;
-    }
-
-    return 0;
+    PacketParser* parser = new PacketParser( file_handle );
+    in_addr ip_to_filter;
+    inet_pton( AF_INET, "192.168.2.20", &ip_to_filter);
+    int return_code = parser->parsePackets(0);
+    std::cout << "IP: " << parser->getIPCount() << std::endl;
+    std::cout << "Ethernet: " << parser->getEthCount() << std::endl;
+    std::cout << "TCP: " << parser->getTCPCount() << std::endl;
+    std::cout << std::endl;
+    std::cout << "Bytes read: " << parser->getBytesRead() << std::endl;
+    std::cout << "TCP Bytes Read: " << parser->getTCPBytesRead() << std::endl;
+    std::cout << "Length of packet data: " << parser->getPacketByteCount() << std::endl;
+    std::cout << "Time elapsed: " << parser->getTimeElapsed() / 1000000 << std::endl;
+    parser->produceBandwidths();
+    return return_code;
 }
