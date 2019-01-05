@@ -26,9 +26,8 @@ int main( int argc, char **argv ) {
     bool bytestream = false;
     bool statistics = false;
     bool throughput = false;
-    std::vector<in_addr> *exclude_ip = new std::vector<in_addr>();
-    std::vector<in_addr> *include_ip = new std::vector<in_addr>();
-    in_addr ip_to_filter;
+    std::vector<char *> *exclude_ip = new std::vector<char *>();
+    std::vector<char *> *include_ip = new std::vector<char *>();
 
     // String representing available short options
     const char *optstring = "f:hbi:x:st";
@@ -66,12 +65,10 @@ int main( int argc, char **argv ) {
                 bytestream = true;
                 break;
             case 'i':
-                inet_pton( AF_INET, optarg, &ip_to_filter);
-                include_ip->push_back(ip_to_filter);
+                include_ip->push_back(optarg);
                 break;
             case 'x':
-                inet_pton( AF_INET, optarg, &ip_to_filter);
-                exclude_ip->push_back(ip_to_filter);
+                exclude_ip->push_back(optarg);
                 break;
             case 's':
                 statistics = true;
@@ -105,8 +102,16 @@ int main( int argc, char **argv ) {
     }
 
     PacketParser* parser = new PacketParser( file_handle );
-    parser->setExclusions( *exclude_ip );
-    parser->setInclusions( *include_ip );
+    try
+    {
+        parser->setExclusions( *exclude_ip );
+        parser->setInclusions( *include_ip );
+    }catch(InvalidIPAddressException& e)
+    {
+        std::cerr << "Could not parse filter list due to malformed IP address"
+        << std::endl;
+        return 1;
+    }
     int return_code = parser->parsePackets(0);
 
     if( statistics )
