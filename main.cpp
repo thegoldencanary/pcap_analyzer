@@ -17,11 +17,24 @@
 int main( int argc, char **argv ) {
 
     // Parse args
-    std::string usage = "Usage: pcap_test [-hbst] [-p protocol..] [-i include_ips..] [-x exclude_ips..] -f filename";
-    opterr = 0;
+    // Usage string
+    std::string usage = "Usage: pcap_test [-hbst] [-i include_ips..] [-x exclude_ips..] -f filename";
+
+    // Flags and ip lists
+    char *input_filename;
+    bool histogram = false;
+    bool bytestream = false;
+    bool statistics = false;
+    bool throughput = false;
+    std::vector<in_addr> *exclude_ip = new std::vector<in_addr>();
+    std::vector<in_addr> *include_ip = new std::vector<in_addr>();
+    in_addr ip_to_filter;
 
     // String representing available short options
-    const char *optstring = "f:hbp:i:x:st";
+    const char *optstring = "f:hbi:x:st";
+
+    // No err message
+    opterr = 0;
 
     // Struct array of long options
     // { name, has_arg, flag, value }
@@ -29,14 +42,14 @@ int main( int argc, char **argv ) {
     {
         {"filename", required_argument, NULL, 'f'},
         {"histogram", no_argument, NULL, 'h'},
-        {"bytes", no_argument, NULL, 'b'},
-        {"protocols", required_argument, NULL, 'p'},
+        {"byte-stream", no_argument, NULL, 'b'},
         {"include-ip", required_argument, NULL, 'i'},
         {"exclude-ip", required_argument, NULL, 'x'},
         {"statistics", no_argument, NULL, 's'},
         {"throughput", no_argument, NULL, 't'}
     };
 
+    // Parse
     int longindex = 0;
     char value = 0;
     while( ( value = getopt_long( argc, argv, optstring, longopts, &longindex) ) != -1 )
@@ -44,20 +57,27 @@ int main( int argc, char **argv ) {
         switch( value )
         {
             case 'f':
+                input_filename = optarg;
                 break;
             case 'h':
+                histogram = true;
                 break;
             case 'b':
-                break;
-            case 'p':
+                bytestream = true;
                 break;
             case 'i':
+                inet_pton( AF_INET, optarg, &ip_to_filter);
+                include_ip->push_back(ip_to_filter);
                 break;
             case 'x':
+                inet_pton( AF_INET, optarg, &ip_to_filter);
+                exclude_ip->push_back(ip_to_filter);
                 break;
             case 's':
+                statistics = true;
                 break;
             case 't':
+                throughput = true;
                 break;
             default:
                 char unknown = optopt;
@@ -66,13 +86,16 @@ int main( int argc, char **argv ) {
         }
     }
 
-    char *input_filename = argv[1];
-    char *source_ip = argv[2];
+    if( !include_ip->empty() && !exclude_ip->empty() )
+    {
+        std::cerr << "[-i --include-ip] and [-x --exclude-ip] are mutually exclusive"
+        << std::endl;
+        return 1;
+    }
 
+    // Open file and get handle
     pcap_t *file_handle;
     char error_buf[PCAP_ERRBUF_SIZE];
-
-    // Open file
     file_handle = pcap_open_offline( input_filename, error_buf );
     if( file_handle == NULL )
     {
@@ -82,17 +105,28 @@ int main( int argc, char **argv ) {
     }
 
     PacketParser* parser = new PacketParser( file_handle );
-    in_addr ip_to_filter;
-    inet_pton( AF_INET, "192.168.2.20", &ip_to_filter);
+    parser->setExclusions( *exclude_ip );
+    parser->setInclusions( *include_ip );
     int return_code = parser->parsePackets(0);
-    std::cout << "IP: " << parser->getIPCount() << std::endl;
-    std::cout << "Ethernet: " << parser->getEthCount() << std::endl;
-    std::cout << "TCP: " << parser->getTCPCount() << std::endl;
-    std::cout << std::endl;
-    std::cout << "Bytes read: " << parser->getBytesRead() << std::endl;
-    std::cout << "TCP Bytes Read: " << parser->getTCPBytesRead() << std::endl;
-    std::cout << "Length of packet data: " << parser->getPacketByteCount() << std::endl;
-    std::cout << "Time elapsed: " << parser->getTimeElapsed() / 1000000 << std::endl;
-    parser->produceBandwidths();
+
+    if( statistics )
+    {
+
+    }
+
+    if( throughput )
+    {
+
+    }
+
+    if( histogram )
+    {
+        parser->produceHistogram( 0, 0 );
+    }
+
+    if( bytestream )
+    {
+
+    }
     return return_code;
 }
