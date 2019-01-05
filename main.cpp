@@ -121,7 +121,7 @@ int main( int argc, char **argv ) {
 
     if( throughput )
     {
-
+        parser->produceBandwidths( PROTOCOL_TCP );
     }
 
     if( histogram )

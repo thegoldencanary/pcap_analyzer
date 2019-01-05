@@ -53,7 +53,6 @@ int PacketParser::parsePackets( uint32_t number )
             {
                 continue;
             }
-
             // Check type of payload
             // If TCP
             if( ip_hdr->ip_p == IPPROTO_TCP )
@@ -117,6 +116,15 @@ int PacketParser::parsePackets( uint32_t number )
             packet_counts[PROTOCOL_IP6] += 1;
             bytes_elapsed += sizeof( ip_hdr );
 
+        }
+        if( ntohs( eth_hdr->ether_type ) == ETHERTYPE_ARP )
+        {
+            const struct arphdr *arp_hdr;
+            arp_hdr = ( struct arphdr* ) ( packet + sizeof(struct ether_header ) );
+            int size = ( arp_hdr->ar_hln + arp_hdr->ar_pln ) * 2;
+            packet_counts[PROTOCOL_ARP] += 1;
+            bytes_elapsed += sizeof( arp_hdr );
+            bytes_elapsed += size;
         }
         else
         {

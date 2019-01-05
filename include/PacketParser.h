@@ -10,7 +10,7 @@
 #include <netinet/tcp.h>
 #include <netinet/udp.h>
 #include <arpa/inet.h>
-
+#include <linux/if_arp.h>
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -23,6 +23,7 @@
 #define ETHERNET 2
 #define PROTOCOL_UDP 3
 #define PROTOCOL_IP6 4
+#define PROTOCOL_ARP 5
 
 // Ipv4 and ipv6 compatible struct
 // family is AF_INET or AF_INET6
@@ -105,6 +106,7 @@ private:
     // (as given by the pcap header)
     void parseTCP( const u_char* packet, int length, int caplen );
     void parseUDP( const u_char* packet, int length, int caplen );
+    void parseARP( const u_char* packet, int length, int caplen );
 
     // Checks filters and returns true if packet is to be filtered
     bool filter( ip_address dest_address );
