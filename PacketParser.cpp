@@ -237,15 +237,15 @@ void PacketParser::setInclusions( std::vector<std::string> ip )
     include_ip = ip;
 }
 
-void PacketParser::produceHistogram( uint32_t protocol, uint64_t bin_width )
+void PacketParser::produceHistogram( std::string protocol, uint64_t bin_width )
 {
-    if( protocol == IPPROTO_TCP )
+    if( protocol == PROTOCOL_TCP )
     {
 
     }
 }
 
-void PacketParser::produceBandwidths( uint32_t protocol )
+void PacketParser::produceBandwidths( std::string protocol )
 {
     uint32_t bandwidth = 0;
     if( data_byte_counts[protocol] != 0 && time_elapsed != 0 )
@@ -255,6 +255,24 @@ void PacketParser::produceBandwidths( uint32_t protocol )
     }
     std::cout << "Bandwidth: " << bandwidth << " bytes/s" << std::endl;
     std::cout << std::endl;
+}
+
+void PacketParser::produceStats()
+{
+    for( std::pair<std::string, uint64_t> pair : packet_counts )
+    {
+        std::string x = std::get<0>( pair );
+        std::cout << "Protocol: " << x << ": " << std::endl;
+        std::cout << packet_counts[x] << " packets" << std::endl;
+        if( data_byte_counts.count(x) )
+        {
+            std::cout << "Payload bytes read: " << data_byte_counts[x] << std::endl;
+        }
+        std::cout << std::endl;
+    }
+    std::cout << "Read a total of " << bytes_elapsed << " bytes" << std::endl;
+    std::cout << "Total bytes in real packets " << packet_bytes << std::endl;
+    std::cout << "Over " << time_elapsed / 1000000 << " seconds" << std::endl;
 }
 
 void PacketParser::readBytes( char* mem, uint32_t bytes)
@@ -272,7 +290,7 @@ std::vector<std::string> * PacketParser::getExclusions()
     return &exclude_ip;
 }
 
-uint32_t PacketParser::getPacketCount( uint32_t protocol )
+uint32_t PacketParser::getPacketCount( std::string protocol )
 {
     return packet_counts[protocol];
 }
@@ -288,7 +306,7 @@ uint64_t PacketParser::getBytesRead()
     return bytes_elapsed;
 }
 
-uint64_t PacketParser::getDataBytesCount( uint32_t protocol )
+uint64_t PacketParser::getDataBytesCount( std::string protocol )
 {
     return data_byte_counts[protocol];
 }

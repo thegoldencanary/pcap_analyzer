@@ -18,12 +18,12 @@
 #include <sstream>
 #include <exception>
 
-#define PROTOCOL_TCP 0
-#define PROTOCOL_IP 1
-#define ETHERNET 2
-#define PROTOCOL_UDP 3
-#define PROTOCOL_IP6 4
-#define PROTOCOL_ARP 5
+#define PROTOCOL_TCP "tcp"
+#define PROTOCOL_IP "ip"
+#define ETHERNET "eth"
+#define PROTOCOL_UDP "udp"
+#define PROTOCOL_IP6 "ip6"
+#define PROTOCOL_ARP "arp"
 
 struct InvalidIPAddressException : public std::exception {
    const char * what () const throw () {
@@ -46,10 +46,12 @@ public:
     // Outputs histogram of given protocol
     // protocol is the netinet/in.h definition
     // bin_width is the bin width in microseconds
-    void produceHistogram( uint32_t protocol, uint64_t bin_width );
+    void produceHistogram( std::string protocol, uint64_t bin_width );
 
     // Produces bandwidths for given protocol
-    void produceBandwidths( uint32_t protocol );
+    void produceBandwidths( std::string protocol );
+
+    void produceStats();
 
     // Reads bytes of length bytes into the array at mem
     // from the internal data buffer
@@ -62,8 +64,8 @@ public:
     std::vector<std::string> * getInclusions();
     std::vector<std::string> * getExclusions();
 
-    uint32_t getPacketCount( uint32_t protocol );
-    uint64_t getDataBytesCount( uint32_t protocol );
+    uint32_t getPacketCount( std::string protocol );
+    uint64_t getDataBytesCount( std::string protocol );
     uint64_t getTimeElapsed();
     uint64_t getBytesRead();
     uint64_t getPacketByteCount();
@@ -80,8 +82,8 @@ private:
     std::vector<std::string> exclude_ip;
 
     // Hash maps of protocol, counts
-    std::unordered_map<uint32_t, uint64_t> packet_counts;
-    std::unordered_map<uint32_t, uint64_t> data_byte_counts;
+    std::unordered_map<std::string, uint64_t> packet_counts;
+    std::unordered_map<std::string, uint64_t> data_byte_counts;
 
     // Statistics
     uint64_t time_elapsed = 0;

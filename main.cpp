@@ -26,12 +26,14 @@ int main( int argc, char **argv ) {
     bool bytestream = false;
     bool statistics = false;
     bool throughput = false;
+    std::string h_protocol = PROTOCOL_TCP;
+    std::string b_protocol = PROTOCOL_TCP;
     int use_destinations = 0;
     std::vector<std::string> *exclude_ip = new std::vector<std::string>();
     std::vector<std::string> *include_ip = new std::vector<std::string>();
 
     // String representing available short options
-    const char *optstring = "f:hbi:x:st";
+    const char *optstring = "f:h:bi:x:stp:";
 
     // No err message
     opterr = 0;
@@ -63,10 +65,12 @@ int main( int argc, char **argv ) {
             }
             case 'h': {
                 histogram = true;
+                h_protocol = optarg;
                 break;
             }
             case 'b': {
                 bytestream = true;
+                b_protocol = optarg;
                 break;
             }
             case 'i': {
@@ -149,17 +153,17 @@ int main( int argc, char **argv ) {
 
     if( statistics )
     {
-
+        parser->produceStats();
     }
 
     if( throughput )
     {
-        parser->produceBandwidths( PROTOCOL_TCP );
+        parser->produceBandwidths( b_protocol );
     }
 
     if( histogram )
     {
-        parser->produceHistogram( 0, 0 );
+        parser->produceHistogram( h_protocol, 0 );
     }
 
     if( bytestream )
