@@ -33,7 +33,7 @@ int main( int argc, char **argv ) {
      You may use only one type of filter at a time \n\
      \n\
      Viable protocols are: \n\
-     tcp udp eth ip ip6 arp \n\
+     tcp udp eth ip ip6 \n\
      \n\
      Note that some protocols will not have underlying \n\
      data and are not useful with -t or -b\n";
