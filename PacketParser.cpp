@@ -183,7 +183,6 @@ int PacketParser::parsePackets( uint32_t number )
             packet_graph.push_back(std::make_pair(x, time_elapsed));
         }
     }
-
     return 0;
 }
 
@@ -276,6 +275,7 @@ void PacketParser::produceHistogram( std::string protocol, uint64_t bin_width )
     }
 
     // Set default width of bins
+    bin_width *= 1000;
     if( bin_width == 0 )
     {
         bin_width = packets->back() / sqrt( packets->size() );
@@ -304,6 +304,9 @@ void PacketParser::produceHistogram( std::string protocol, uint64_t bin_width )
     bin = 0;
     uint64_t max_value = *std::max_element( counts->begin(), counts->end() );
     uint64_t bar_length = max_value / 32 + 1;
+    std::cout << std::endl;
+    std::cout << "Time: milliseconds  | frequency" << std::endl;
+    std::cout << std::endl;
     for( auto x : *counts )
     {
         std::cout << bin << ":" << std::endl;
@@ -313,7 +316,7 @@ void PacketParser::produceHistogram( std::string protocol, uint64_t bin_width )
             std::cout << "=";
         }
         std::cout << " " << x << std::endl;
-        bin += bin_width;
+        bin += bin_width / 1000;
     }
     std::cout << bin << ":" << std::endl;
 }

@@ -1,15 +1,3 @@
-#include <iostream>
-#include <fstream>
-#include <pcap.h>
-#include <stdio.h>
-#include <string.h>
-#include <net/ethernet.h>
-#include <netinet/ip.h>
-#include <netinet/in.h>
-#include <netinet/tcp.h>
-#include <arpa/inet.h>
-#include <vector>
-#include <unordered_map>
 #include <getopt.h>
 
 #include "PacketParser.h"
@@ -18,7 +6,7 @@ int main( int argc, char **argv ) {
 
     // Parse args
     // Usage and help
-    std::string usage = "Usage: pcap_test [-bs] [-t protocol] [-h [protocol] [-i ] [-i ip | \"ip1 ip2\"] [-x ip | \"ip1 ip2\"] [--filter-destination] [--help] -f filename";
+    std::string usage = "Usage: pcap_test [-bs] [-t protocol] [-h [protocol] [-i ] [-i ip | \"ip1 ip2\"] [-x ip | \"ip1 ip2\"] [--filter-destination] [--bin-width ms] [--help] -f filename";
     std::string help_text =
     "\n\
      This analyzer parses files formatted \n\
@@ -37,6 +25,7 @@ int main( int argc, char **argv ) {
                           given protocol datastream \n\
      --filter-dest        Filters IPs by destination only \n\
      --filter-src         Filters IPs by source only \n\
+     --bin-width          Set histogram bin width in ms\n\
      --help               Prints this help menu \n\
                           \n\
      For filtering multiple IP addresses, wrap space \n\
@@ -59,11 +48,12 @@ int main( int argc, char **argv ) {
     std::string t_protocol = PROTOCOL_TCP;
     std::string b_protocol = PROTOCOL_TCP;
     int filter_type = 0;
+    uint64_t bin_width = 0;
     std::vector<std::string> *exclude_ip = new std::vector<std::string>();
     std::vector<std::string> *include_ip = new std::vector<std::string>();
 
     // String representing available short options
-    const char *optstring = "f:h:bi:x:st:";
+    const char *optstring = ":f:h:bi:x:st:w";
 
     // No option err message - will handle internally
     opterr = 0;
@@ -81,6 +71,7 @@ int main( int argc, char **argv ) {
         {"throughput", no_argument, NULL, 't'},
         {"filter-dest", no_argument, &filter_type, 1},
         {"filter-src", no_argument, &filter_type, -1},
+        {"bin-width", required_argument, NULL, 'w'},
         {"help", no_argument, NULL, 'a'}
     };
 
@@ -147,10 +138,22 @@ int main( int argc, char **argv ) {
                 std::cout << help_text << std::endl;
                 return 0;
             }
+            case 'w': {
+                bin_width = atoi( optarg );
+                break;
+            }
             default: {
-                char unknown = optopt;
-                std::cout << "Bad option: " << unknown << "\n"
-                          << usage << std::endl;
+                char opt = optopt;
+                if( value == '?' )
+                {
+                    std::cout << "Unknown option: " << opt << "\n"
+                              << usage << std::endl;
+                }
+                else
+                {
+                    std::cout << "Bad option: " << opt << "\n"
+                              << usage << std::endl;
+                }
             }
         }
     }
@@ -203,7 +206,7 @@ int main( int argc, char **argv ) {
 
     if( histogram )
     {
-        parser->produceHistogram( h_protocol, 0 );
+        parser->produceHistogram( h_protocol, bin_width );
     }
 
     if( bytestream )

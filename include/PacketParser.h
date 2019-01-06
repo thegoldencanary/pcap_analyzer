@@ -94,7 +94,6 @@ private:
     uint64_t bytes_elapsed = 0;
     uint64_t current_time = 0;
     uint64_t packet_time = 0;
-
     uint64_t packet_bytes = 0;
 
     // Internal TCP data buffer
