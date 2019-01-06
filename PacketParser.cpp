@@ -182,7 +182,7 @@ bool PacketParser::filter( ip_address dest_address )
             }
         }
     }
-    return true;
+    return false;
 }
 
 void PacketParser::parseTCP( const u_char* packet, int length, int caplen )
@@ -278,8 +278,12 @@ void PacketParser::produceHistogram( uint32_t protocol, uint64_t bin_width )
 
 void PacketParser::produceBandwidths( uint32_t protocol )
 {
-    uint32_t bandwidth = data_byte_counts[protocol] /
-                         ( time_elapsed / 1000000 );
+    uint32_t bandwidth = 0;
+    if( data_byte_counts[protocol] != 0 && time_elapsed != 0 )
+    {
+        bandwidth = data_byte_counts[protocol] /
+                    ( time_elapsed / 1000000 );
+    }
     std::cout << "Bandwidth: " << bandwidth << " bytes/s" << std::endl;
     std::cout << std::endl;
 }
