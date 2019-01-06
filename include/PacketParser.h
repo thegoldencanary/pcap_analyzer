@@ -25,15 +25,6 @@
 #define PROTOCOL_IP6 4
 #define PROTOCOL_ARP 5
 
-// Ipv4 and ipv6 compatible struct
-// family is AF_INET or AF_INET6
-// address is actual representation of address
-struct ip_address
-{
-    int family;
-    char address[16];
-};
-
 struct InvalidIPAddressException : public std::exception {
    const char * what () const throw () {
       return "Invalid IP address";
@@ -46,11 +37,11 @@ class PacketParser
 public:
 
     // Constructor
-    PacketParser(pcap_t *file_handle);
+    PacketParser(pcap_t *file_handle, int filter_destinations);
 
     // Set filter lists
-    void setExclusions( std::vector<char *> ip );
-    void setInclusions( std::vector<char *> ip );
+    void setExclusions( std::vector<std::string> ip );
+    void setInclusions( std::vector<std::string> ip );
 
     // Outputs histogram of given protocol
     // protocol is the netinet/in.h definition
@@ -68,8 +59,8 @@ public:
     int parsePackets( uint32_t number );
 
     // Getters
-    std::vector<ip_address> * getInclusions();
-    std::vector<ip_address> * getExclusions();
+    std::vector<std::string> * getInclusions();
+    std::vector<std::string> * getExclusions();
 
     uint32_t getPacketCount( uint32_t protocol );
     uint64_t getDataBytesCount( uint32_t protocol );
@@ -82,9 +73,11 @@ private:
     // File handle to capture file
     pcap_t* file_handle;
 
+    int filter_dest = 0;
+
     // Filter lists
-    std::vector<ip_address> include_ip;
-    std::vector<ip_address> exclude_ip;
+    std::vector<std::string> include_ip;
+    std::vector<std::string> exclude_ip;
 
     // Hash maps of protocol, counts
     std::unordered_map<uint32_t, uint64_t> packet_counts;
@@ -109,7 +102,7 @@ private:
     void parseARP( const u_char* packet, int length, int caplen );
 
     // Checks filters and returns true if packet is to be filtered
-    bool filter( ip_address dest_address );
+    bool filter( std::string dest_address );
 };
 
 

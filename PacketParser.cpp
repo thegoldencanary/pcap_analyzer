@@ -2,10 +2,11 @@
 
 #include "PacketParser.h"
 
-PacketParser::PacketParser(pcap_t * file_handle)
+PacketParser::PacketParser(pcap_t * file_handle, int filter_dest)
     :file_handle( file_handle ),
-    exclude_ip( std::vector<ip_address>() ),
-    include_ip( std::vector<ip_address>() )
+    exclude_ip( std::vector<std::string>() ),
+    include_ip( std::vector<std::string>() ),
+    filter_dest( filter_dest )
 {
 }
 
@@ -46,13 +47,21 @@ int PacketParser::parsePackets( uint32_t number )
             in_addr src_address = ip_hdr->ip_src;
 
             // Check filters
-            ip_address filter_address;
-            filter_address.family = AF_INET;
-            memcpy( &filter_address.address + 12, &dest_address.s_addr, 4 );
-            if( filter( filter_address ) )
+            char address[INET_ADDRSTRLEN];
+            if( filter_dest )
+            {
+                inet_ntop( AF_INET, &dest_address.s_addr, address, INET_ADDRSTRLEN );
+            }
+            else
+            {
+                inet_ntop( AF_INET, &src_address.s_addr, address, INET_ADDRSTRLEN );
+            }
+            std::string *filter_address = new std::string( address );
+            if( filter( *filter_address ) )
             {
                 continue;
             }
+
             // Check type of payload
             // If TCP
             if( ip_hdr->ip_p == IPPROTO_TCP )
@@ -61,7 +70,7 @@ int PacketParser::parsePackets( uint32_t number )
                            + sizeof( struct ip );
                 parseTCP( packet, size, header->caplen );
             }
-            if( ip_hdr->ip_p == IPPROTO_UDP )
+            else if( ip_hdr->ip_p == IPPROTO_UDP )
             {
                 int size = sizeof( struct ether_header )
                            + sizeof( struct ip );
@@ -70,14 +79,15 @@ int PacketParser::parsePackets( uint32_t number )
             else
             {
                 // Unsupported protocol, will return
-                return -1;
+                std::cerr << "Unsupported Transport protocol" << std::endl;
+                return 1;
             }
 
             packet_counts[PROTOCOL_IP] += 1;
             bytes_elapsed += sizeof( ip_hdr );
 
         }
-        if( ntohs( eth_hdr->ether_type ) == ETHERTYPE_IPV6 )
+        else if( ntohs( eth_hdr->ether_type ) == ETHERTYPE_IPV6 )
         {
             const struct ip6_hdr *ip_hdr;
             ip_hdr = ( struct ip6_hdr* )( packet + sizeof(struct ether_header ) );
@@ -85,10 +95,17 @@ int PacketParser::parsePackets( uint32_t number )
             in6_addr src_address = ip_hdr->ip6_src;
 
             // Check filters
-            ip_address filter_address;
-            filter_address.family = AF_INET6;
-            memcpy( &filter_address.address, &dest_address, 16 );
-            if( filter( filter_address ) )
+            char address[INET6_ADDRSTRLEN];
+            if( filter_dest )
+            {
+                inet_ntop( AF_INET, &dest_address, address, INET6_ADDRSTRLEN );
+            }
+            else
+            {
+                inet_ntop( AF_INET, &src_address, address, INET6_ADDRSTRLEN );
+            }
+            std::string *filter_address = new std::string( address );
+            if( filter( *filter_address ) )
             {
                 continue;
             }
@@ -101,7 +118,7 @@ int PacketParser::parsePackets( uint32_t number )
                            + sizeof( struct ip6_hdr );
                 parseTCP( packet, size, header->caplen );
             }
-            if( ip_hdr->ip6_ctlun.ip6_un1.ip6_un1_nxt == IPPROTO_UDP )
+            else if( ip_hdr->ip6_ctlun.ip6_un1.ip6_un1_nxt == IPPROTO_UDP )
             {
                 int size = sizeof( struct ether_header )
                            + sizeof( struct ip6_hdr );
@@ -110,14 +127,15 @@ int PacketParser::parsePackets( uint32_t number )
             else
             {
                 // Unsupported protocol, will return
-                return -1;
+                std::cerr << "Unsupported Transport protocol" << std::endl;
+                return 1;
             }
 
             packet_counts[PROTOCOL_IP6] += 1;
             bytes_elapsed += sizeof( ip_hdr );
 
         }
-        if( ntohs( eth_hdr->ether_type ) == ETHERTYPE_ARP )
+        else if( ntohs( eth_hdr->ether_type ) == ETHERTYPE_ARP )
         {
             const struct arphdr *arp_hdr;
             arp_hdr = ( struct arphdr* ) ( packet + sizeof(struct ether_header ) );
@@ -129,7 +147,8 @@ int PacketParser::parsePackets( uint32_t number )
         else
         {
             // Unsupported ethertype, will return
-            return -1;
+            std::cerr << "Unsupported ethertype" << std::endl;
+            return 1;
         }
         packet_counts[ETHERNET] += 1;
         bytes_elapsed += sizeof( eth_hdr );
@@ -146,24 +165,11 @@ int PacketParser::parsePackets( uint32_t number )
     return 0;
 }
 
-bool PacketParser::filter( ip_address dest_address )
+bool PacketParser::filter( std::string address )
 {
-    int offset = 12;
-    int length = 4;
-    bool ip6 = false;
-    if( dest_address.family == AF_INET6 )
-    {
-        offset = 0;
-        length = 16;
-        ip6 = true;
-    }
     for( auto x : exclude_ip )
     {
-        if( ip6 && x.family == AF_INET )
-        {
-            continue;
-        }
-        if( !memcmp( &dest_address.address + offset, x.address + offset, length ) )
+        if( x == address )
         {
             return true;
         }
@@ -172,15 +178,12 @@ bool PacketParser::filter( ip_address dest_address )
     {
         for( auto x : include_ip )
         {
-            if( ip6 && x.family == AF_INET )
-            {
-                continue;
-            }
-            if( !memcmp( &dest_address.address + offset, x.address + offset, length ) )
+            if( x == address )
             {
                 return false;
             }
         }
+        return true;
     }
     return false;
 }
@@ -224,48 +227,14 @@ void PacketParser::parseUDP(const u_char* packet, int length, int caplen)
     data_byte_counts[PROTOCOL_UDP] += size;
 }
 
-void PacketParser::setExclusions( std::vector<char *> ip )
+void PacketParser::setExclusions( std::vector<std::string> ip )
 {
-    std::vector<ip_address> ips;
-    for( auto x : ip )
-    {
-        ip_address address;
-        int result = inet_pton( AF_INET, x, address.address + 12 );
-        address.family = AF_INET;
-        if( result == 0 )
-        {
-            result = inet_pton( AF_INET6, x, address.address );
-            address.family = AF_INET6;
-        }
-        if( !result )
-        {
-            throw InvalidIPAddressException();
-        }
-        ips.push_back(address);
-    }
-    exclude_ip = ips;
+    exclude_ip = ip;
 }
 
-void PacketParser::setInclusions( std::vector<char *> ip )
+void PacketParser::setInclusions( std::vector<std::string> ip )
 {
-    std::vector<ip_address> ips;
-    for( auto x : ip )
-    {
-        ip_address address;
-        int result = inet_pton( AF_INET, x, address.address + 12 );
-        address.family = AF_INET;
-        if( result == 0 )
-        {
-            result = inet_pton( AF_INET6, x, address.address );
-            address.family = AF_INET6;
-        }
-        if( !result )
-        {
-            throw InvalidIPAddressException();
-        }
-        ips.push_back(address);
-    }
-    include_ip = ips;
+    include_ip = ip;
 }
 
 void PacketParser::produceHistogram( uint32_t protocol, uint64_t bin_width )
@@ -293,12 +262,12 @@ void PacketParser::readBytes( char* mem, uint32_t bytes)
     byte_buffer.read(mem, bytes);
 }
 
-std::vector<ip_address> * PacketParser::getInclusions()
+std::vector<std::string> * PacketParser::getInclusions()
 {
     return &include_ip;
 }
 
-std::vector<ip_address> * PacketParser::getExclusions()
+std::vector<std::string> * PacketParser::getExclusions()
 {
     return &exclude_ip;
 }

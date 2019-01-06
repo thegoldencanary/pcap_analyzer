@@ -26,8 +26,9 @@ int main( int argc, char **argv ) {
     bool bytestream = false;
     bool statistics = false;
     bool throughput = false;
-    std::vector<char *> *exclude_ip = new std::vector<char *>();
-    std::vector<char *> *include_ip = new std::vector<char *>();
+    int use_destinations = 0;
+    std::vector<std::string> *exclude_ip = new std::vector<std::string>();
+    std::vector<std::string> *include_ip = new std::vector<std::string>();
 
     // String representing available short options
     const char *optstring = "f:hbi:x:st";
@@ -45,7 +46,8 @@ int main( int argc, char **argv ) {
         {"include-ip", required_argument, NULL, 'i'},
         {"exclude-ip", required_argument, NULL, 'x'},
         {"statistics", no_argument, NULL, 's'},
-        {"throughput", no_argument, NULL, 't'}
+        {"throughput", no_argument, NULL, 't'},
+        {"filter-destination", no_argument, &use_destinations, 1}
     };
 
     // Parse
@@ -55,31 +57,61 @@ int main( int argc, char **argv ) {
     {
         switch( value )
         {
-            case 'f':
+            case 'f': {
                 input_filename = optarg;
                 break;
-            case 'h':
+            }
+            case 'h': {
                 histogram = true;
                 break;
-            case 'b':
+            }
+            case 'b': {
                 bytestream = true;
                 break;
-            case 'i':
-                include_ip->push_back(optarg);
+            }
+            case 'i': {
+                char *tokens = strtok( optarg, " " );
+                while( tokens != NULL )
+                {
+                    std::string s = tokens;
+                    if( s[0] == '"' )
+                    {
+                        s = s.substr( 0, s.length() + 1 );
+                        s = s.substr( 1 );
+                    }
+                    include_ip->push_back(s);
+                    tokens = strtok( NULL, " " );
+                }
                 break;
-            case 'x':
-                exclude_ip->push_back(optarg);
+            }
+            case 'x': {
+                char *tokens = strtok( optarg, " " );
+                while( tokens != NULL )
+                {
+                    std::string s = tokens;
+                    if( s[0] == '"' )
+                    {
+                        s = s.substr( 0, s.length() + 1 );
+                        s = s.substr( 1 );
+                    }
+                    exclude_ip->push_back(s);
+                    tokens = strtok( NULL, " " );
+                }
                 break;
-            case 's':
+            }
+            case 's': {
                 statistics = true;
                 break;
-            case 't':
+            }
+            case 't': {
                 throughput = true;
                 break;
-            default:
+            }
+            default: {
                 char unknown = optopt;
                 std::cout << "Unknown option: " << unknown << "\n"
                           << usage << std::endl;
+            }
         }
     }
 
@@ -101,7 +133,7 @@ int main( int argc, char **argv ) {
         return 1;
     }
 
-    PacketParser* parser = new PacketParser( file_handle );
+    PacketParser* parser = new PacketParser( file_handle, use_destinations );
     try
     {
         parser->setExclusions( *exclude_ip );
@@ -112,6 +144,7 @@ int main( int argc, char **argv ) {
         << std::endl;
         return 1;
     }
+
     int return_code = parser->parsePackets(0);
 
     if( statistics )
@@ -131,7 +164,13 @@ int main( int argc, char **argv ) {
 
     if( bytestream )
     {
-
+        uint64_t size = parser->getDataBytesCount( PROTOCOL_TCP );
+        char data[size];
+        parser->readBytes( data, size );
+        for( int i = 0; i < size; i++ )
+        {
+            std::cout << data[i];
+        }
     }
     return return_code;
 }
