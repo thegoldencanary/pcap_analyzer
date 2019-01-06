@@ -65,7 +65,7 @@ int main( int argc, char **argv ) {
     // String representing available short options
     const char *optstring = "f:h:bi:x:st:";
 
-    // No err message
+    // No option err message - will handle internally
     opterr = 0;
 
     // Struct array of long options
@@ -180,7 +180,8 @@ int main( int argc, char **argv ) {
     {
         parser->setExclusions( *exclude_ip );
         parser->setInclusions( *include_ip );
-    }catch(InvalidIPAddressException& e)
+    }
+    catch( InvalidIPAddressException& e )
     {
         std::cerr << "Could not parse filter list due to malformed IP address"
         << std::endl;

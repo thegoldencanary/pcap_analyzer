@@ -25,7 +25,6 @@
 #define ETHERNET "eth"
 #define PROTOCOL_UDP "udp"
 #define PROTOCOL_IP6 "ip6"
-#define PROTOCOL_ARP "arp"
 
 struct InvalidIPAddressException : public std::exception {
    const char * what () const throw () {

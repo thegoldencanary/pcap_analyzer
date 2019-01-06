@@ -93,7 +93,7 @@ int PacketParser::parsePackets( uint32_t number )
             else
             {
                 // Unsupported protocol, will return
-                std::cerr << "Unsupported Transport protocol" << std::endl;
+                std::cerr << "Unsupported transport layer protocol" << std::endl;
                 return 1;
             }
 
@@ -151,7 +151,7 @@ int PacketParser::parsePackets( uint32_t number )
             else
             {
                 // Unsupported protocol, will return
-                std::cerr << "Unsupported Transport protocol" << std::endl;
+                std::cerr << "Unsupported transport layer protocol" << std::endl;
                 return 1;
             }
 
@@ -160,22 +160,13 @@ int PacketParser::parsePackets( uint32_t number )
             bytes_elapsed += sizeof( ip_hdr );
 
         }
-        else if( ntohs( eth_hdr->ether_type ) == ETHERTYPE_ARP )
-        {
-            const struct arphdr *arp_hdr;
-            arp_hdr = ( struct arphdr* ) ( packet + sizeof(struct ether_header ) );
-            int size = ( arp_hdr->ar_hln + arp_hdr->ar_pln ) * 2;
-            packet_counts[PROTOCOL_ARP] += 1;
-            packets_found->push_back(PROTOCOL_ARP);
-            bytes_elapsed += sizeof( arp_hdr );
-            bytes_elapsed += size;
-        }
         else
         {
             // Unsupported ethertype, will return
-            std::cerr << "Unsupported ethertype" << std::endl;
+            std::cerr << "Unsupported link layer protocol" << std::endl;
             return 1;
         }
+        // Update statistics
         packet_counts[ETHERNET] += 1;
         packets_found->push_back(ETHERNET);
         bytes_elapsed += sizeof( eth_hdr );
@@ -224,6 +215,7 @@ void PacketParser::parseTCP( const u_char* packet, int length, int caplen )
     // Get header
     const struct tcphdr *tcp_hdr;
     tcp_hdr = ( tcphdr* )( packet + length );
+
     // Get pointer to data
     int offset = (int) tcp_hdr->doff * 4;
     const char *data = ( const char * )( packet + sizeof( struct ether_header )
@@ -233,8 +225,10 @@ void PacketParser::parseTCP( const u_char* packet, int length, int caplen )
                                 - sizeof( struct ip )
                                 - sizeof( struct tcphdr );
 
+    // Write data to buffer
     byte_buffer.write(data, size);
 
+    // Update statistics
     packet_counts[PROTOCOL_TCP]+= 1;
     bytes_elapsed += sizeof( tcp_hdr );
     bytes_elapsed += size;
@@ -243,9 +237,12 @@ void PacketParser::parseTCP( const u_char* packet, int length, int caplen )
 
 void PacketParser::parseUDP(const u_char* packet, int length, int caplen)
 {
+    // Get header
     const struct udphdr *udp_hdr;
     udp_hdr = ( udphdr* )( packet + length );
-    // Get pointer to data
+
+    // Get pointer to data - no udp stream functionality for now, so
+    // we won't write to buffer
     const char *data = ( const char * )( packet + sizeof( struct ether_header )
                                 + sizeof( struct ip )
                                 + sizeof( struct udphdr ) );
@@ -253,24 +250,16 @@ void PacketParser::parseUDP(const u_char* packet, int length, int caplen)
                                 - sizeof( struct ip )
                                 - sizeof( struct udphdr );
 
+    // Update statistics
     packet_counts[PROTOCOL_UDP]+= 1;
     bytes_elapsed += sizeof( udp_hdr );
     bytes_elapsed += size;
     data_byte_counts[PROTOCOL_UDP] += size;
 }
 
-void PacketParser::setExclusions( std::vector<std::string> ip )
-{
-    exclude_ip = ip;
-}
-
-void PacketParser::setInclusions( std::vector<std::string> ip )
-{
-    include_ip = ip;
-}
-
 void PacketParser::produceHistogram( std::string protocol, uint64_t bin_width )
 {
+    // Get protocol packets
     std::vector<uint64_t> *packets = new std::vector<uint64_t>();
     for( auto x : packet_graph )
     {
@@ -279,15 +268,20 @@ void PacketParser::produceHistogram( std::string protocol, uint64_t bin_width )
             packets->push_back( std::get<1>( x ) );
         }
     }
+
     if( packets->size() == 0 )
     {
         std::cout << "No packets of given protocol" << std::endl;
         return;
     }
+
+    // Set default width of bins
     if( bin_width == 0 )
     {
         bin_width = packets->back() / sqrt( packets->size() );
     }
+
+    // Get counts
     std::vector<uint64_t> *counts = new std::vector<uint64_t>();
     counts->push_back(0);
     int current_count = 0;
@@ -305,6 +299,8 @@ void PacketParser::produceHistogram( std::string protocol, uint64_t bin_width )
             counts->push_back(1);
         }
     }
+
+    // Print histogram
     bin = 0;
     uint64_t max_value = *std::max_element( counts->begin(), counts->end() );
     uint64_t bar_length = max_value / 32 + 1;
@@ -354,6 +350,16 @@ void PacketParser::produceStats()
     << data_byte_total << " of which were payload data bytes" << std::endl;
     std::cout << "Over " << time_elapsed / 1000000 << " seconds" << std::endl;
     std::cout << "Total bytes in real packets " << packet_bytes << std::endl;
+}
+
+void PacketParser::setExclusions( std::vector<std::string> ip )
+{
+    exclude_ip = ip;
+}
+
+void PacketParser::setInclusions( std::vector<std::string> ip )
+{
+    include_ip = ip;
 }
 
 void PacketParser::readBytes( char* mem, uint32_t bytes)
