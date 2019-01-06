@@ -18,7 +18,7 @@ int main( int argc, char **argv ) {
 
     // Parse args
     // Usage and help
-    std::string usage = "Usage: pcap_test [-st] [-b protocol] [-h [protocol] [-i ] [-i ip | \"ip1 ip2\"] [-x ip | \"ip1 ip2\"] [--filter-destination] [--help] -f filename";
+    std::string usage = "Usage: pcap_test [-bs] [-t protocol] [-h [protocol] [-i ] [-i ip | \"ip1 ip2\"] [-x ip | \"ip1 ip2\"] [--filter-destination] [--help] -f filename";
     std::string help_text =
     "\n\
      This analyzer parses files formatted \n\
@@ -35,8 +35,8 @@ int main( int argc, char **argv ) {
                           of the packets in the file \n\
      -t, --throughput     Prints the throughput of the \n\
                           given protocol datastream \n\
-     --filter-destination Filters IPs by destination \n\
-                          address instead of source \n\
+     --filter-dest        Filters IPs by destination only \n\
+     --filter-src         Filters IPs by source only \n\
      --help               Prints this help menu \n\
                           \n\
      For filtering multiple IP addresses, wrap space \n\
@@ -58,12 +58,12 @@ int main( int argc, char **argv ) {
     std::string h_protocol = PROTOCOL_TCP;
     std::string t_protocol = PROTOCOL_TCP;
     std::string b_protocol = PROTOCOL_TCP;
-    int use_destinations = 0;
+    int filter_type = 0;
     std::vector<std::string> *exclude_ip = new std::vector<std::string>();
     std::vector<std::string> *include_ip = new std::vector<std::string>();
 
     // String representing available short options
-    const char *optstring = "f:h:bi:x:st";
+    const char *optstring = "f:h:bi:x:st:";
 
     // No err message
     opterr = 0;
@@ -79,7 +79,8 @@ int main( int argc, char **argv ) {
         {"exclude-ip", required_argument, NULL, 'x'},
         {"statistics", no_argument, NULL, 's'},
         {"throughput", no_argument, NULL, 't'},
-        {"filter-destination", no_argument, &use_destinations, 1},
+        {"filter-dest", no_argument, &filter_type, 1},
+        {"filter-src", no_argument, &filter_type, -1},
         {"help", no_argument, NULL, 'a'}
     };
 
@@ -148,12 +149,13 @@ int main( int argc, char **argv ) {
             }
             default: {
                 char unknown = optopt;
-                std::cout << "Unknown option: " << unknown << "\n"
+                std::cout << "Bad option: " << unknown << "\n"
                           << usage << std::endl;
             }
         }
     }
 
+    // Check for exclusitivity
     if( !include_ip->empty() && !exclude_ip->empty() )
     {
         std::cerr << "[-i --include-ip] and [-x --exclude-ip] are mutually exclusive"
@@ -172,7 +174,8 @@ int main( int argc, char **argv ) {
         return 1;
     }
 
-    PacketParser* parser = new PacketParser( file_handle, use_destinations );
+    // Create parser and set filters
+    PacketParser* parser = new PacketParser( file_handle, filter_type );
     try
     {
         parser->setExclusions( *exclude_ip );
@@ -184,6 +187,7 @@ int main( int argc, char **argv ) {
         return 1;
     }
 
+    // Parse packets
     int return_code = parser->parsePackets(0);
 
     if( statistics )

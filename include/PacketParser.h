@@ -77,7 +77,7 @@ private:
     // File handle to capture file
     pcap_t* file_handle;
 
-    int filter_dest = 0;
+    int filter_type = 0;
 
     // Filter lists
     std::vector<std::string> include_ip;

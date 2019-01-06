@@ -2,12 +2,13 @@
 
 #include "PacketParser.h"
 
-PacketParser::PacketParser(pcap_t * file_handle, int filter_dest)
+PacketParser::PacketParser(pcap_t * file_handle, int filter_type)
     :file_handle( file_handle ),
     exclude_ip( std::vector<std::string>() ),
     include_ip( std::vector<std::string>() ),
+    data_byte_counts( std::unordered_map<std::string, uint64_t>() ),
     packet_graph( std::vector<std::pair<std::string, uint64_t>>() ),
-    filter_dest( filter_dest )
+    filter_type( filter_type )
 {
 }
 
@@ -49,17 +50,26 @@ int PacketParser::parsePackets( uint32_t number )
             in_addr src_address = ip_hdr->ip_src;
 
             // Check filters
-            char address[INET_ADDRSTRLEN];
-            if( filter_dest )
+            char addr_d[INET_ADDRSTRLEN];
+            char addr_s[INET_ADDRSTRLEN];
+            int filter_count = 0;
+
+            inet_ntop( AF_INET, &dest_address.s_addr, addr_d, INET_ADDRSTRLEN );
+            inet_ntop( AF_INET, &src_address.s_addr, addr_s, INET_ADDRSTRLEN );
+            if( filter_type == -1 )
             {
-                inet_ntop( AF_INET, &dest_address.s_addr, address, INET_ADDRSTRLEN );
+                filter_count += filter( std::string( addr_s ) );
+            }
+            else if( filter_type == 1 )
+            {
+                filter_count += filter( std::string( addr_d ) );
             }
             else
             {
-                inet_ntop( AF_INET, &src_address.s_addr, address, INET_ADDRSTRLEN );
+                filter_count += filter( std::string( addr_d ) );
+                filter_count += filter( std::string( addr_s ) );
             }
-            std::string *filter_address = new std::string( address );
-            if( filter( *filter_address ) )
+            if( filter_count > 0 )
             {
                 continue;
             }
@@ -100,17 +110,26 @@ int PacketParser::parsePackets( uint32_t number )
             in6_addr src_address = ip_hdr->ip6_src;
 
             // Check filters
-            char address[INET6_ADDRSTRLEN];
-            if( filter_dest )
+            char addr_d[INET6_ADDRSTRLEN];
+            char addr_s[INET6_ADDRSTRLEN];
+            int filter_count = 0;
+
+            inet_ntop( AF_INET6, &dest_address, addr_d, INET6_ADDRSTRLEN );
+            inet_ntop( AF_INET6, &src_address, addr_s, INET6_ADDRSTRLEN );
+            if( filter_type == -1 )
             {
-                inet_ntop( AF_INET, &dest_address, address, INET6_ADDRSTRLEN );
+                filter_count += filter( std::string( addr_s ) );
+            }
+            else if( filter_type == 1 )
+            {
+                filter_count += filter( std::string( addr_d ) );
             }
             else
             {
-                inet_ntop( AF_INET, &src_address, address, INET6_ADDRSTRLEN );
+                filter_count += filter( std::string( addr_d ) );
+                filter_count += filter( std::string( addr_s ) );
             }
-            std::string *filter_address = new std::string( address );
-            if( filter( *filter_address ) )
+            if( filter_count > 0 )
             {
                 continue;
             }
@@ -206,9 +225,10 @@ void PacketParser::parseTCP( const u_char* packet, int length, int caplen )
     const struct tcphdr *tcp_hdr;
     tcp_hdr = ( tcphdr* )( packet + length );
     // Get pointer to data
+    int offset = (int) tcp_hdr->doff * 4;
     const char *data = ( const char * )( packet + sizeof( struct ether_header )
                                 + sizeof( struct ip )
-                                + sizeof( struct tcphdr ) );
+                                + offset );
     int size = caplen - sizeof( struct ether_header )
                                 - sizeof( struct ip )
                                 - sizeof( struct tcphdr );
@@ -304,6 +324,7 @@ void PacketParser::produceHistogram( std::string protocol, uint64_t bin_width )
 
 void PacketParser::produceBandwidths( std::string protocol )
 {
+    std::cout << std::endl;
     uint32_t bandwidth = 0;
     if( data_byte_counts[protocol] != 0 && time_elapsed != 0 )
     {
