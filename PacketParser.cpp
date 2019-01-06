@@ -6,6 +6,7 @@ PacketParser::PacketParser(pcap_t * file_handle, int filter_dest)
     :file_handle( file_handle ),
     exclude_ip( std::vector<std::string>() ),
     include_ip( std::vector<std::string>() ),
+    packet_graph( std::vector<std::pair<std::string, uint64_t>>() ),
     filter_dest( filter_dest )
 {
 }
@@ -31,6 +32,7 @@ int PacketParser::parsePackets( uint32_t number )
             return 1;
         }
 
+        std::vector<std::string> *packets_found = new std::vector<std::string>();
         const struct ether_header *eth_hdr;
 
         // Get the inital ethernet header
@@ -69,12 +71,14 @@ int PacketParser::parsePackets( uint32_t number )
                 int size = sizeof( struct ether_header )
                            + sizeof( struct ip );
                 parseTCP( packet, size, header->caplen );
+                packets_found->push_back(PROTOCOL_TCP);
             }
             else if( ip_hdr->ip_p == IPPROTO_UDP )
             {
                 int size = sizeof( struct ether_header )
                            + sizeof( struct ip );
                 parseUDP( packet, size, header->caplen );
+                packets_found->push_back(PROTOCOL_UDP);
             }
             else
             {
@@ -84,6 +88,7 @@ int PacketParser::parsePackets( uint32_t number )
             }
 
             packet_counts[PROTOCOL_IP] += 1;
+            packets_found->push_back(PROTOCOL_IP);
             bytes_elapsed += sizeof( ip_hdr );
 
         }
@@ -132,6 +137,7 @@ int PacketParser::parsePackets( uint32_t number )
             }
 
             packet_counts[PROTOCOL_IP6] += 1;
+            packets_found->push_back(PROTOCOL_IP6);
             bytes_elapsed += sizeof( ip_hdr );
 
         }
@@ -141,6 +147,7 @@ int PacketParser::parsePackets( uint32_t number )
             arp_hdr = ( struct arphdr* ) ( packet + sizeof(struct ether_header ) );
             int size = ( arp_hdr->ar_hln + arp_hdr->ar_pln ) * 2;
             packet_counts[PROTOCOL_ARP] += 1;
+            packets_found->push_back(PROTOCOL_ARP);
             bytes_elapsed += sizeof( arp_hdr );
             bytes_elapsed += size;
         }
@@ -151,6 +158,7 @@ int PacketParser::parsePackets( uint32_t number )
             return 1;
         }
         packet_counts[ETHERNET] += 1;
+        packets_found->push_back(ETHERNET);
         bytes_elapsed += sizeof( eth_hdr );
         packet_bytes += header->len;
         packet_time = header->ts.tv_sec * 1000000 + header->ts.tv_usec;
@@ -160,6 +168,10 @@ int PacketParser::parsePackets( uint32_t number )
         }
         time_elapsed += packet_time - current_time;
         current_time = packet_time;
+        for( auto x : *packets_found )
+        {
+            packet_graph.push_back(std::make_pair(x, time_elapsed));
+        }
     }
 
     return 0;
@@ -239,10 +251,55 @@ void PacketParser::setInclusions( std::vector<std::string> ip )
 
 void PacketParser::produceHistogram( std::string protocol, uint64_t bin_width )
 {
-    if( protocol == PROTOCOL_TCP )
+    std::vector<uint64_t> *packets = new std::vector<uint64_t>();
+    for( auto x : packet_graph )
     {
-
+        if( std::get<0>( x ) == protocol )
+        {
+            packets->push_back( std::get<1>( x ) );
+        }
     }
+    if( packets->size() == 0 )
+    {
+        std::cout << "No packets of given protocol" << std::endl;
+        return;
+    }
+    if( bin_width == 0 )
+    {
+        bin_width = packets->back() / sqrt( packets->size() );
+    }
+    std::vector<uint64_t> *counts = new std::vector<uint64_t>();
+    counts->push_back(0);
+    int current_count = 0;
+    uint64_t bin = bin_width;
+    for( auto x : *packets )
+    {
+        if( x < bin )
+        {
+            counts->at(current_count) += 1;
+        }
+        else
+        {
+            current_count += 1;
+            bin += bin_width;
+            counts->push_back(1);
+        }
+    }
+    bin = 0;
+    uint64_t max_value = *std::max_element( counts->begin(), counts->end() );
+    uint64_t bar_length = max_value / 32 + 1;
+    for( auto x : *counts )
+    {
+        std::cout << bin << ":" << std::endl;
+        std::cout << "\t";
+        for( int i = 0; i < ( x / bar_length ) + 1; i++ )
+        {
+            std::cout << "=";
+        }
+        std::cout << " " << x << std::endl;
+        bin += bin_width;
+    }
+    std::cout << bin << ":" << std::endl;
 }
 
 void PacketParser::produceBandwidths( std::string protocol )
@@ -259,6 +316,7 @@ void PacketParser::produceBandwidths( std::string protocol )
 
 void PacketParser::produceStats()
 {
+    uint64_t data_byte_total = 0;
     for( std::pair<std::string, uint64_t> pair : packet_counts )
     {
         std::string x = std::get<0>( pair );
@@ -266,13 +324,15 @@ void PacketParser::produceStats()
         std::cout << packet_counts[x] << " packets" << std::endl;
         if( data_byte_counts.count(x) )
         {
+            data_byte_total += data_byte_counts[x];
             std::cout << "Payload bytes read: " << data_byte_counts[x] << std::endl;
         }
         std::cout << std::endl;
     }
-    std::cout << "Read a total of " << bytes_elapsed << " bytes" << std::endl;
-    std::cout << "Total bytes in real packets " << packet_bytes << std::endl;
+    std::cout << "Read a total of " << bytes_elapsed << " bytes, "
+    << data_byte_total << " of which were payload data bytes" << std::endl;
     std::cout << "Over " << time_elapsed / 1000000 << " seconds" << std::endl;
+    std::cout << "Total bytes in real packets " << packet_bytes << std::endl;
 }
 
 void PacketParser::readBytes( char* mem, uint32_t bytes)

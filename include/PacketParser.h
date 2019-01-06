@@ -17,6 +17,8 @@
 #include <unordered_map>
 #include <sstream>
 #include <exception>
+#include <math.h>
+#include <iterator>
 
 #define PROTOCOL_TCP "tcp"
 #define PROTOCOL_IP "ip"
@@ -80,6 +82,9 @@ private:
     // Filter lists
     std::vector<std::string> include_ip;
     std::vector<std::string> exclude_ip;
+
+    // Packets over time
+    std::vector<std::pair<std::string, uint64_t>> packet_graph;
 
     // Hash maps of protocol, counts
     std::unordered_map<std::string, uint64_t> packet_counts;

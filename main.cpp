@@ -17,8 +17,37 @@
 int main( int argc, char **argv ) {
 
     // Parse args
-    // Usage string
-    std::string usage = "Usage: pcap_test [-hbst] [-i include_ips..] [-x exclude_ips..] -f filename";
+    // Usage and help
+    std::string usage = "Usage: pcap_test [-st] [-b protocol] [-h [protocol] [-i ] [-i ip | \"ip1 ip2\"] [-x ip | \"ip1 ip2\"] [--filter-destination] [--help] -f filename";
+    std::string help_text =
+    "\n\
+     This analyzer parses files formatted \n\
+     in the pcap file format and provides statistics \n\
+     on the packets within. \n\n\
+     -f, --filename       Select file for input \n\
+     -h, --histogram      Prints a histogram of \n\
+                          the given protocol \n\
+     -b, --byte-stream    Outputs to standard out the \n\
+                          TCP byte stream \n\
+     -i, --include-ip     Parses only the ip(s) given \n\
+     -x, --exclude-ip     Ignores the ip(s) given \n\
+     -s, --statistics     Prints to output statistics \n\
+                          of the packets in the file \n\
+     -t, --throughput     Prints the throughput of the \n\
+                          given protocol datastream \n\
+     --filter-destination Filters IPs by destination \n\
+                          address instead of source \n\
+     --help               Prints this help menu \n\
+                          \n\
+     For filtering multiple IP addresses, wrap space \n\
+     seperated in \"\" (\"192.168.0.1 192.168.1.1\") \n\
+     You may use only one type of filter at a time \n\
+     \n\
+     Viable protocols are: \n\
+     tcp udp eth ip ip6 arp \n\
+     \n\
+     Note that some protocols will not have underlying \n\
+     data and are not useful with -t or -b\n";
 
     // Flags and ip lists
     char *input_filename;
@@ -27,13 +56,14 @@ int main( int argc, char **argv ) {
     bool statistics = false;
     bool throughput = false;
     std::string h_protocol = PROTOCOL_TCP;
+    std::string t_protocol = PROTOCOL_TCP;
     std::string b_protocol = PROTOCOL_TCP;
     int use_destinations = 0;
     std::vector<std::string> *exclude_ip = new std::vector<std::string>();
     std::vector<std::string> *include_ip = new std::vector<std::string>();
 
     // String representing available short options
-    const char *optstring = "f:h:bi:x:stp:";
+    const char *optstring = "f:h:bi:x:st";
 
     // No err message
     opterr = 0;
@@ -49,7 +79,8 @@ int main( int argc, char **argv ) {
         {"exclude-ip", required_argument, NULL, 'x'},
         {"statistics", no_argument, NULL, 's'},
         {"throughput", no_argument, NULL, 't'},
-        {"filter-destination", no_argument, &use_destinations, 1}
+        {"filter-destination", no_argument, &use_destinations, 1},
+        {"help", no_argument, NULL, 'a'}
     };
 
     // Parse
@@ -70,7 +101,6 @@ int main( int argc, char **argv ) {
             }
             case 'b': {
                 bytestream = true;
-                b_protocol = optarg;
                 break;
             }
             case 'i': {
@@ -109,7 +139,12 @@ int main( int argc, char **argv ) {
             }
             case 't': {
                 throughput = true;
+                t_protocol = optarg;
                 break;
+            }
+            case 'a': {
+                std::cout << help_text << std::endl;
+                return 0;
             }
             default: {
                 char unknown = optopt;
@@ -158,7 +193,7 @@ int main( int argc, char **argv ) {
 
     if( throughput )
     {
-        parser->produceBandwidths( b_protocol );
+        parser->produceBandwidths( t_protocol );
     }
 
     if( histogram )
@@ -168,7 +203,7 @@ int main( int argc, char **argv ) {
 
     if( bytestream )
     {
-        uint64_t size = parser->getDataBytesCount( PROTOCOL_TCP );
+        uint64_t size = parser->getDataBytesCount( b_protocol );
         char data[size];
         parser->readBytes( data, size );
         for( int i = 0; i < size; i++ )
